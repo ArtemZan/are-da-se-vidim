@@ -1,8 +1,13 @@
 <?php
+session_start();
+require_once 'vendor/autoload.php';
 require_once 'config.php';
+require_once 'google_config.php';
 
 $shareId = $_GET['id'] ?? '';
 $event = null;
+$isLoggedIn = isset($_SESSION['user']);
+$preferences = [];
 
 if ($shareId) {
     try {
@@ -11,7 +16,14 @@ if ($shareId) {
         $event = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($event) {
-            $stmt = $pdo->prepare("SELECT * FROM date_preferences WHERE event_id = ? ORDER BY created_at DESC");
+            // Get all preferences with user information
+            $stmt = $pdo->prepare("
+                SELECT dp.*, u.name, u.email, u.picture_url 
+                FROM date_preferences dp 
+                JOIN users u ON dp.user_id = u.id 
+                WHERE dp.event_id = ? 
+                ORDER BY dp.created_at DESC
+            ");
             $stmt->execute([$event['id']]);
             $preferences = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
@@ -19,6 +31,16 @@ if ($shareId) {
         $error = 'Database error';
     }
 }
+
+// Initialize Google Client for login button
+$client = new Google_Client();
+$client->setClientId($google_config['client_id']);
+$client->setClientSecret($google_config['client_secret']);
+$client->setRedirectUri($google_config['redirect_uri']);
+$client->addScope($google_config['scopes']);
+
+// Store current URL for redirect after login
+$_SESSION['redirect_after_login'] = $_SERVER['REQUEST_URI'];
 ?>
 
 <!DOCTYPE html>
@@ -41,10 +63,20 @@ if ($shareId) {
                 <p><strong>Created:</strong> <?php echo date('F j, Y, g:i a', strtotime($event['created_at'])); ?></p>
             </div>
 
+            <?php if ($isLoggedIn): ?>
+            <div class="user-info">
+                <img src="<?php echo htmlspecialchars($_SESSION['user']['picture']); ?>" 
+                     alt="Profile picture" 
+                     class="profile-picture">
+                <span class="user-name"><?php echo htmlspecialchars($_SESSION['user']['name']); ?></span>
+                <a href="logout.php" class="logout-btn">Logout</a>
+            </div>
+
             <div class="preference-section">
                 <h3>Add Your Availability</h3>
                 <form id="preferenceForm">
                     <input type="hidden" id="eventId" value="<?php echo $event['id']; ?>">
+                    <input type="hidden" id="userId" value="<?php echo $_SESSION['user']['id']; ?>">
                     
                     <div class="form-group datetime-group">
                         <div class="datetime-input">
@@ -68,13 +100,27 @@ if ($shareId) {
                     <button type="submit">Add Preference</button>
                 </form>
             </div>
+            <?php else: ?>
+            <div class="login-section">
+                <p>Please sign in with Google to add your availability preferences:</p>
+                <a href="<?php echo $client->createAuthUrl(); ?>" class="google-login-btn">
+                    Sign in with Google
+                </a>
+            </div>
+            <?php endif; ?>
 
             <div class="existing-preferences">
-                <h3>Existing Preferences</h3>
+                <h3>All Preferences</h3>
                 <div id="preferencesContainer">
                     <?php foreach ($preferences as $pref): ?>
                         <div class="preference-item" 
                              style="background-color: <?php echo getPreferenceColor($pref['preference_score']); ?>">
+                            <div class="preference-user">
+                                <img src="<?php echo htmlspecialchars($pref['picture_url']); ?>" 
+                                     alt="User picture" 
+                                     class="user-picture">
+                                <span class="user-name"><?php echo htmlspecialchars($pref['name']); ?></span>
+                            </div>
                             <div class="preference-details">
                                 <div class="dates">
                                     <?php echo date('M j, Y', strtotime($pref['start_date'])); ?> - 
@@ -89,11 +135,13 @@ if ($shareId) {
                                 <span class="score">
                                     Preference: <?php echo $pref['preference_score']; ?>/10
                                 </span>
+                                <?php if ($isLoggedIn && $_SESSION['user']['id'] == $pref['user_id']): ?>
                                 <button type="button" 
                                         class="delete-btn"
                                         onclick="deletePreference(<?php echo $pref['id']; ?>)">
                                     ×
                                 </button>
+                                <?php endif; ?>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -101,6 +149,56 @@ if ($shareId) {
             </div>
 
             <style>
+                .user-info {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    margin-bottom: 20px;
+                    padding: 10px;
+                    background: #f8f9fa;
+                    border-radius: 4px;
+                }
+                .profile-picture {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 50%;
+                }
+                .user-picture {
+                    width: 30px;
+                    height: 30px;
+                    border-radius: 50%;
+                }
+                .logout-btn {
+                    margin-left: auto;
+                    padding: 5px 10px;
+                    background: #dc3545;
+                    color: white;
+                    text-decoration: none;
+                    border-radius: 4px;
+                    font-size: 14px;
+                }
+                .google-login-btn {
+                    display: inline-block;
+                    padding: 10px 20px;
+                    background: #4285f4;
+                    color: white;
+                    text-decoration: none;
+                    border-radius: 4px;
+                    margin: 20px 0;
+                }
+                .login-section {
+                    text-align: center;
+                    padding: 20px;
+                    background: #f8f9fa;
+                    border-radius: 4px;
+                    margin: 20px 0;
+                }
+                .preference-user {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-bottom: 8px;
+                }
                 .preference-item {
                     padding: 10px;
                     margin: 5px 0;

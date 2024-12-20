@@ -1,10 +1,17 @@
 <?php
+session_start();
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST');
 header('Access-Control-Allow-Headers: Content-Type');
 
 require_once 'config.php';
+
+if (!isset($_SESSION['user'])) {
+    http_response_code(401);
+    echo json_encode(['error' => 'User not authenticated']);
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
@@ -19,12 +26,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $stmt = $pdo->prepare("
             INSERT INTO date_preferences 
-            (event_id, start_date, end_date, preference_score) 
-            VALUES (?, ?, ?, ?)
+            (event_id, user_id, start_date, end_date, preference_score) 
+            VALUES (?, ?, ?, ?, ?)
         ");
         
         $stmt->execute([
             $data['eventId'],
+            $_SESSION['user']['id'],
             $data['startDate'],
             $data['endDate'],
             $data['preferenceScore']
