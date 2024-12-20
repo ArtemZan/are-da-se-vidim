@@ -1,0 +1,29 @@
+# Composer dependencies
+/vendor/
+
+# Composer lock file (optional, but recommended to commit)
+# composer.lock
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE specific files
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# PHP specific
+*.log
+*.cache 
