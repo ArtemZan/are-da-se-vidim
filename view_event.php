@@ -3,6 +3,7 @@ session_start();
 require_once 'vendor/autoload.php';
 require_once 'config.php';
 require_once 'google_config.php';
+require_once 'calculate_perfect_time.php';
 
 $shareId = $_GET['id'] ?? '';
 $event = null;
@@ -147,6 +148,31 @@ $_SESSION['redirect_after_login'] = $_SERVER['REQUEST_URI'];
                     <?php endforeach; ?>
                 </div>
             </div>
+
+            <?php
+            // Move perfect time calculation here
+            $perfectPeriods = findPerfectTime($event['time_required'], $preferences);
+            if (!empty($perfectPeriods)): ?>
+                <div class="perfect-time-section">
+                    <h3>Perfect Time Suggestions</h3>
+                    <div class="perfect-time-list">
+                        <?php foreach (array_slice($perfectPeriods, 0, 3) as $index => $period): ?>
+                            <div class="perfect-time-item">
+                                <div class="rank"><?php echo $index + 1; ?></div>
+                                <div class="time-details">
+                                    <div class="dates">
+                                        <?php echo formatPeriodDateTime($period['start']); ?> - 
+                                        <?php echo formatPeriodDateTime($period['end']); ?>
+                                    </div>
+                                    <div class="score">
+                                        Total Score: <?php echo $period['score']; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
 
             <style>
                 .user-info {
@@ -298,6 +324,63 @@ $_SESSION['redirect_after_login'] = $_SERVER['REQUEST_URI'];
                 }
                 .flatpickr-calendar {
                     padding-bottom: 10px;
+                }
+                .perfect-time-section {
+                    margin-top: 40px;
+                    padding: 20px;
+                    background: #f8f9fa;
+                    border-radius: 8px;
+                    border-top: 2px solid #e9ecef;
+                }
+
+                .perfect-time-section h3 {
+                    margin-top: 0;
+                    color: #2c3e50;
+                    text-align: center;
+                    margin-bottom: 20px;
+                }
+
+                .perfect-time-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                }
+
+                .perfect-time-item {
+                    display: flex;
+                    align-items: center;
+                    padding: 10px;
+                    background: white;
+                    border-radius: 6px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                }
+
+                .perfect-time-item .rank {
+                    width: 30px;
+                    height: 30px;
+                    background: #007bff;
+                    color: white;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: bold;
+                    margin-right: 15px;
+                }
+
+                .perfect-time-item .time-details {
+                    flex-grow: 1;
+                }
+
+                .perfect-time-item .dates {
+                    font-weight: bold;
+                    color: #2c3e50;
+                }
+
+                .perfect-time-item .score {
+                    font-size: 0.9em;
+                    color: #666;
+                    margin-top: 4px;
                 }
             </style>
 
@@ -518,8 +601,14 @@ $_SESSION['redirect_after_login'] = $_SERVER['REQUEST_URI'];
                         return;
                     }
 
-                    // Check for exact time overlap
+                    // Check for exact time overlap with only current user's preferences
+                    const currentUserId = document.getElementById('userId').value;
                     const hasOverlap = existingPreferences.some(pref => {
+                        // Only check preferences from the current user
+                        if (pref.user_id != currentUserId) {
+                            return false;
+                        }
+
                         const prefStart = new Date(pref.start_date);
                         const prefEnd = new Date(pref.end_date);
                         
@@ -534,7 +623,7 @@ $_SESSION['redirect_after_login'] = $_SERVER['REQUEST_URI'];
                     });
 
                     if (hasOverlap) {
-                        alert('Selected time range overlaps with existing preferences. Please choose a different time.');
+                        alert('Selected time range overlaps with your existing preferences. Please choose a different time.');
                         return;
                     }
 
