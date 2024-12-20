@@ -46,14 +46,16 @@ if ($shareId) {
                 <form id="preferenceForm">
                     <input type="hidden" id="eventId" value="<?php echo $event['id']; ?>">
                     
-                    <div class="form-group">
-                        <label for="startDateTime">Start Date and Time</label>
-                        <input type="text" id="startDateTime" placeholder="Select start date and time" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="endDateTime">End Date and Time</label>
-                        <input type="text" id="endDateTime" placeholder="Select end date and time" required>
+                    <div class="form-group datetime-group">
+                        <div class="datetime-input">
+                            <label for="startDateTime">From</label>
+                            <input type="text" id="startDateTime" placeholder="Select start time" required>
+                        </div>
+                        <div class="arrow">→</div>
+                        <div class="datetime-input">
+                            <label for="endDateTime">To</label>
+                            <input type="text" id="endDateTime" placeholder="Select end time" required>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -79,8 +81,8 @@ if ($shareId) {
                                     <?php echo date('M j, Y', strtotime($pref['end_date'])); ?>
                                 </div>
                                 <div class="times">
-                                    <?php echo date('g:i A', strtotime($pref['start_date'])); ?> - 
-                                    <?php echo date('g:i A', strtotime($pref['end_date'])); ?>
+                                    <?php echo date('H:i', strtotime($pref['start_date'])); ?> - 
+                                    <?php echo date('H:i', strtotime($pref['end_date'])); ?>
                                 </div>
                             </div>
                             <div class="preference-right">
@@ -147,17 +149,57 @@ if ($shareId) {
                     padding-top: 2rem;
                     border-top: 1px solid #ddd;
                 }
-                .flatpickr-day.disabled-date {
+                .flatpickr-day.has-preference {
                     background-color: var(--preference-color);
                     border-color: transparent;
                     color: white;
-                    cursor: not-allowed;
                 }
-                .flatpickr-day.disabled-date:hover {
+                .flatpickr-day.has-preference:hover {
                     background-color: var(--preference-color);
+                    opacity: 0.8;
                 }
                 .flatpickr-calendar.hasTime .flatpickr-time {
                     border-top: 1px solid #e6e6e6;
+                }
+                .datetime-group {
+                    display: flex;
+                    align-items: flex-end;
+                    gap: 15px;
+                }
+                .datetime-input {
+                    flex: 1;
+                }
+                .datetime-input input {
+                    box-sizing: border-box;
+                    width: 100%;
+                }
+                .arrow {
+                    font-size: 24px;
+                    margin-bottom: 10px;
+                    color: #666;
+                }
+                .picker-title {
+                    text-align: center;
+                    padding: 10px;
+                    font-weight: bold;
+                    background: #f0f0f0;
+                    border-bottom: 1px solid #ddd;
+                }
+                .done-button {
+                    width: 100%;
+                    padding: 8px;
+                    background: #007bff;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    margin-top: 10px;
+                }
+                .done-button:hover {
+                    background: #0056b3;
+                }
+                .flatpickr-calendar {
+                    padding-bottom: 10px;
                 }
             </style>
 
@@ -222,14 +264,14 @@ if ($shareId) {
                         ...pref,
                         formattedDate: `${pref.start_date.split(' ')[0]}: ${
                             new Date(pref.start_date).toLocaleTimeString('en-US', { 
-                                hour: 'numeric', 
+                                hour: '2-digit', 
                                 minute: '2-digit',
-                                hour12: true 
+                                hour12: false 
                             })} - ${
                             new Date(pref.end_date).toLocaleTimeString('en-US', { 
-                                hour: 'numeric', 
+                                hour: '2-digit', 
                                 minute: '2-digit',
-                                hour12: true 
+                                hour12: false 
                             })}`
                     }));
                 }
@@ -238,7 +280,7 @@ if ($shareId) {
                 const pickerConfig = {
                     enableTime: true,
                     dateFormat: "Y-m-d H:i",
-                    time_24hr: false,
+                    time_24hr: true,
                     minDate: "today",
                     minuteIncrement: 30,
                     onDayCreate: function(dObj, dStr, fp, dayElem) {
@@ -251,7 +293,7 @@ if ($shareId) {
                         );
 
                         if (datePrefs.length > 0) {
-                            dayElem.classList.add('disabled-date');
+                            dayElem.classList.add('has-preference');
                             // Set custom property for color based on highest preference
                             const highestPref = Math.max(...datePrefs.map(p => p.preference_score));
                             dayElem.style.setProperty(
@@ -267,6 +309,19 @@ if ($shareId) {
                     }
                 };
 
+                // Add styles for the picker titles
+                const titleStyle = document.createElement('style');
+                titleStyle.textContent = `
+                    .picker-title {
+                        text-align: center;
+                        padding: 10px;
+                        font-weight: bold;
+                        background: #f0f0f0;
+                        border-bottom: 1px solid #ddd;
+                    }
+                `;
+                document.head.appendChild(titleStyle);
+
                 // Initialize Flatpickr for start date-time
                 const startPicker = flatpickr("#startDateTime", {
                     ...pickerConfig,
@@ -274,12 +329,48 @@ if ($shareId) {
                         if (selectedDates[0]) {
                             endPicker.set('minDate', selectedDates[0]);
                         }
+                    },
+                    onReady: function(selectedDates, dateStr, instance) {
+                        // Add title to the calendar
+                        const title = document.createElement('div');
+                        title.className = 'picker-title';
+                        title.textContent = 'Start date';
+                        instance.calendarContainer.insertBefore(title, instance.calendarContainer.firstChild);
+
+                        // Add Next button
+                        const nextButton = document.createElement('button');
+                        nextButton.className = 'done-button';
+                        nextButton.innerHTML = 'Next →';
+                        nextButton.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            instance.close();
+                            // Open the end date picker after a short delay
+                            setTimeout(() => endPicker.open(), 100);
+                        });
+                        instance.calendarContainer.appendChild(nextButton);
                     }
                 });
 
                 // Initialize Flatpickr for end date-time
                 const endPicker = flatpickr("#endDateTime", {
-                    ...pickerConfig
+                    ...pickerConfig,
+                    onReady: function(selectedDates, dateStr, instance) {
+                        // Add title to the calendar
+                        const title = document.createElement('div');
+                        title.className = 'picker-title';
+                        title.textContent = 'End date';
+                        instance.calendarContainer.insertBefore(title, instance.calendarContainer.firstChild);
+
+                        // Add Done button
+                        const doneButton = document.createElement('button');
+                        doneButton.className = 'done-button';
+                        doneButton.textContent = 'Done';
+                        doneButton.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            instance.close();
+                        });
+                        instance.calendarContainer.appendChild(doneButton);
+                    }
                 });
 
                 // Add hover styles for the tooltips
@@ -303,6 +394,10 @@ if ($shareId) {
                         z-index: 10;
                         width: max-content;
                     }
+                    .flatpickr-day.has-preference.selected {
+                        border: 2px solid #333;
+                        background-color: var(--preference-color) !important;
+                    }
                 `;
                 document.head.appendChild(style);
 
@@ -325,16 +420,23 @@ if ($shareId) {
                         return;
                     }
 
-                    // Check if selected range overlaps with existing preferences
+                    // Check for exact time overlap
                     const hasOverlap = existingPreferences.some(pref => {
                         const prefStart = new Date(pref.start_date);
                         const prefEnd = new Date(pref.end_date);
                         
-                        return (start <= prefEnd && end >= prefStart);
+                        // Check if the time ranges overlap
+                        const timeOverlap = (
+                            (start >= prefStart && start < prefEnd) || // Start time falls within existing preference
+                            (end > prefStart && end <= prefEnd) || // End time falls within existing preference
+                            (start <= prefStart && end >= prefEnd) // New preference completely encompasses existing one
+                        );
+                        
+                        return timeOverlap;
                     });
 
                     if (hasOverlap) {
-                        alert('Selected date and time range overlaps with existing preferences');
+                        alert('Selected time range overlaps with existing preferences. Please choose a different time.');
                         return;
                     }
 
