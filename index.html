@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Form</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <form id="eventForm">
+            <div class="form-group">
+                <label for="eventName">Event Name</label>
+                <input type="text" id="eventName" name="eventName" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="timeRequired">Time Required (e.g., 3h, 2d)</label>
+                <input type="text" id="timeRequired" name="timeRequired" 
+                       pattern="^[0-9]+[hd]$" 
+                       title="Please enter a number followed by 'h' for hours or 'd' for days (e.g., 3h, 2d)"
+                       required>
+            </div>
+
+            <button type="submit">Next</button>
+        </form>
+        <div id="shareLink" style="display: none; margin-top: 20px;">
+            <p>Share this link with others:</p>
+            <input type="text" id="shareLinkInput" readonly style="background-color: #f5f5f5;">
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('eventForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const eventName = document.getElementById('eventName').value;
+            const timeRequired = document.getElementById('timeRequired').value;
+            
+            try {
+                const response = await fetch('create_event.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        eventName: eventName,
+                        timeRequired: timeRequired
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    const shareLinkDiv = document.getElementById('shareLink');
+                    const shareLinkInput = document.getElementById('shareLinkInput');
+                    shareLinkDiv.style.display = 'block';
+                    shareLinkInput.value = `http://${data.shareLink}`;
+                    shareLinkInput.select();
+                } else {
+                    alert('Error creating event: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error creating event. Please try again.');
+                console.error('Error:', error);
+            }
+        });
+    </script>
+</body>
+</html> 
